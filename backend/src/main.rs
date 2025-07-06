@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use std::{path::Path, process::Command};
-mod video_metadata;
+use std::io;
+// mod video_metadata;
 
 // use video_metadata::get_video_metadata;
 
@@ -30,6 +31,11 @@ pub enum TransitionType {
     WipeTR,
     WipeBL,
     WipeBR,
+}
+
+pub enum LUTs {
+    PictureFXLeicaM8BW125,
+    RetroWarm,
 }
 
 /// Concatenates two videos together without any transition effects
@@ -361,6 +367,58 @@ async fn create_solid_color_image(color: &str, dimensions: (u32, u32), output_pa
     Ok(())
 }
 
+/// Applies a LUT (Look-Up Table) to a video file using ffmpeg.
+///
+/// # Arguments
+/// * `input_path` - Path to the input video file
+/// * `output_path` - Path where the processed video will be saved
+/// * `lut_path` - Path to the LUT file (.cube format)
+///
+/// # Returns
+/// * `Result<()>` - Ok(()) on success, or an error if the process fails
+///
+/// # Example
+/// ```
+/// apply_lut_to_video("input.mp4", "output.mp4", "my_lut.cube").await?;
+/// ```
+pub async fn apply_lut_to_video(
+    input_path: &str,
+    output_path: &str,
+    lut: LUTs,
+) -> Result<()> {
+
+    // Verify input file exists
+    if !Path::new(input_path).exists() {
+        anyhow::bail!("Input video not found: {}", input_path);
+    }
+    
+    let lut_path = match lut {
+        LUTs::PictureFXLeicaM8BW125 => "PictureFX-LeicaM8-BW-125.cube",
+        LUTs::RetroWarm => "Retro-Warm.cube",
+    };
+    // Verify LUT file exists
+    if !Path::new(&lut_path).exists() {
+        anyhow::bail!("LUT file not found: {}", &lut_path);
+    }
+    // Build the ffmpeg command
+    let status = Command::new("ffmpeg")
+        .args(&[
+            "-i", input_path,
+            "-vf", &format!("lut3d={}", lut_path),
+            "-c:a", "copy",  // Copy audio without re-encoding
+            output_path,
+            "-y",  // Overwrite output file if it exists
+        ])
+        .status()
+        .context("Failed to execute ffmpeg command")?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        anyhow::bail!("ffmpeg process failed with status: {}", status);
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 1: Add text to video
@@ -368,15 +426,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let font_path = "src/Roboto_Mono/RobotoMono-Italic-VariableFont_wght.ttf";
     let text = "Im drinking coffee";
     let font_size = 50;
-    let metadata_res = video_metadata::get_video_metadata("src/input.mp4").await;
-    let metadata = metadata_res.unwrap();
-    let width = metadata.width;
-    let hight = metadata.height;
-    let duration = metadata.duration;
-    println!("width: {}, hight: {}, duration: {},", width, hight, duration);
+    // let metadata_res = video_metadata::get_video_metadata("src/input.mp4").await;
+    // let metadata = metadata_res.unwrap();
+    // let width = metadata.width;
+    // let hight = metadata.height;
+    // let duration = metadata.duration;
+    // println!("width: {}, hight: {}, duration: {},", width, hight, duration);
 
-    let black_img = create_solid_color_image("black", (800, 50), "black_square.png").await.unwrap();
-    overlay_image_on_video("src/input.mp4", "with_image.mp4", "black_square.png", ((width / 2) - 400) as i32, (hight - 200) as i32, 0.0, Some(1000), Some(100)).await.unwrap();
+    // let black_img = create_solid_color_image("black", (800, 50), "black_square.png").await.unwrap();
+    // overlay_image_on_video("src/input.mp4", "with_image.mp4", "black_square.png", ((width / 2) - 400) as i32, (hight - 200) as i32, 0.0, Some(1000), Some(100)).await.unwrap();
 
 
     
@@ -384,8 +442,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     eprintln!("Error splitting video: {}", e);
     //     std::process::exit(1);
     // }
-    add_centered_text_to_video("temp2.mp4", "temp2-text.mp4", font_path, text, font_size).await?;
+    // add_centered_text_to_video("temp2.mp4", "temp2-text.mp4", font_path, text, font_size).await?;
     // concatenate_videos("temp1.mp4", "temp2-text.mp4", "final-out.mp4").await;
-    
+
+    apply_lut_to_video("lut-test1.webm", "lut-test1-lut.mp4", LUTs::PictureFXLeicaM8BW125).await.unwrap();
     Ok(())
 }
