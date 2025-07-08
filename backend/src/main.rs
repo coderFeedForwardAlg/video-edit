@@ -2,10 +2,12 @@ use anyhow::{Context, Result};
 use std::{path::Path, process::Command};
 use std::io;
 // mod video_metadata;
+use reqwest;
+use ollama_rs::models::ModelOptions;
 
+use std::path::PathBuf;
 // use video_metadata::get_video_metadata;
-
-
+use ollama_rs::{coordinator::Coordinator, generation::chat::ChatMessage, Ollama};
 /// Supported transition types for video merging
 #[derive(Debug, Clone, Copy)]
 pub enum TransitionType {
@@ -419,6 +421,33 @@ pub async fn apply_lut_to_video(
     }
 }
 
+/// Get the CPU temperature in Celsius.
+#[ollama_rs::function]
+async fn get_cpu_temperature() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    Ok("42.7".to_string())
+}
+
+/// Get the available space in bytes for a given path.
+///
+/// * path - Path to check available space for.
+#[ollama_rs::function]
+async fn get_available_space(
+    path: PathBuf,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    Ok("30".to_string())
+}
+
+/// Get the weather for a given city.
+///
+/// * city - City to get the weather for.
+#[ollama_rs::function]
+async fn get_weather(city: String) -> Result<String, Box<dyn std::error::Error + Sync + Send>> {
+    Ok(reqwest::get(format!("https://wttr.in/{city}?format=%C+%t"))
+        .await?
+        .text()
+        .await?)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 1: Add text to video
@@ -445,6 +474,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // add_centered_text_to_video("temp2.mp4", "temp2-text.mp4", font_path, text, font_size).await?;
     // concatenate_videos("temp1.mp4", "temp2-text.mp4", "final-out.mp4").await;
 
-    apply_lut_to_video("lut-test1.webm", "lut-test1-lut.mp4", LUTs::PictureFXLeicaM8BW125).await.unwrap();
+    // apply_lut_to_video("lut-test1.webm", "lut-test1.2-lut.mp4", LUTs::RetroWarm).await.unwrap();
+
+    let ollama = Ollama::default();
+    let history = vec![];
+    let mut coordinator = Coordinator::new(ollama, "llama3.2".to_string(), history)
+        .add_tool(get_cpu_temperature);
+
+    let user_messages = vec![
+        "What's the CPU temperature?",
+        "What's the available space in the root directory?",
+        "What's the weather in Berlin?",
+    ];
+
+    for user_message in user_messages {
+        println!("User: {user_message}");
+
+        let user_message = ChatMessage::user(user_message.to_owned());
+        let resp = coordinator.chat(vec![user_message]).await?;
+        println!("Assistant: {}", resp.message.content);
+    }
+
     Ok(())
 }

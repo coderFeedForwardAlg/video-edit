@@ -1,0 +1,24 @@
+[package]
+name = "backend"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "video_edit"
+crate-type = ["cdylib"]
+
+[dependencies]
+bigdecimal = "0.4.8"
+convert_case = "0.8.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sf = "0.1.1"
+sqlx = { version = "0.8.5", features = ["runtime-tokio-rustls", "postgres"] }
+ollama-rs = { version = "0.3.1", features = ["stream", "macros"] }
+tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread"] }
+schemars = { version = "1.0.3", features = ["derive"] }
+reqwest = { version = "0.12.21", features = ["json", "gzip", "rustls-tls"] }
+anyhow = "1.0.98"
+
+# Python bindings
+pyo3 = { version = "0.21.2", features = ["extension-module", "abi3-py37"] }
