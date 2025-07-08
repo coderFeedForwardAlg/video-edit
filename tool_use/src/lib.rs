@@ -1,5 +1,3 @@
-//! Python bindings for the video-edit backend
-
 use pyo3::prelude::*;
 
 /// Formats the sum of two numbers as string.
@@ -10,7 +8,7 @@ fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn video_edit(_py: Python, m: &PyModule) -> PyResult<()> {
+fn tool_use(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     Ok(())
 }
