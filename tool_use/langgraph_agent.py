@@ -1,78 +1,65 @@
-import json
-from typing import Dict, List, Any, Optional
-from langchain_ollama import ChatOllama
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from langchain_core.messages import HumanMessage
 import tool_use
 
+@tool
 def sum_as_string(a: int, b: int) -> str:
     """Returns the sum of two numbers as a string."""
+    print(f"{a} + {b} = {tool_use.sum_as_string(a, b)}")
     return tool_use.sum_as_string(a, b)
+@tool
+def minus(a: int, b: int) -> str:
+    """Returns the difference of two numbers as a string."""
+    print(f"{a} - {b} = {tool_use.subtract_as_string(a, b)}")
+    return tool_use.subtract_as_string(a, b)
 
-# Initialize the LLM
-llm = ChatOllama(
-    model="llama3",
-    temperature=0
-)
 
-def extract_numbers(text: str) -> tuple[Optional[int], Optional[int]]:
-    """Extract two integers from a text string."""
-    import re
-    numbers = [int(num) for num in re.findall(r'\d+', text)]
-    if len(numbers) >= 2:
-        return numbers[0], numbers[1]
-    return None, None
+# Initialize the OpenAI model
+llm = ChatOpenAI(model="gpt-3.5-turbo")
 
-def run_agent(question: str) -> str:
-    """Run the agent with the given question and return the final response."""
-    try:
-        # First, try to extract numbers from the question
-        a, b = extract_numbers(question)
-        
-        if a is not None and b is not None:
-            # If we found two numbers, use the tool directly
-            result = sum_as_string(a, b)
-            return f"The sum of {a} and {b} is {result}"
-        
-        # If we couldn't extract numbers, ask the LLM to help
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a helpful AI assistant that helps with calculations. 
-            When asked to add two numbers, extract them from the question and provide the result.
-            If the question doesn't contain two numbers, ask for clarification."""),
-            ("human", "{question}")
-        ])
-        
-        chain = prompt | llm | StrOutputParser()
-        response = chain.invoke({"question": question})
-        
-        # Check if the response contains numbers and try to calculate
-        a, b = extract_numbers(response)
-        if a is not None and b is not None:
-            result = sum_as_string(a, b)
-            return f"The sum of {a} and {b} is {result}"
+# Define the tools
+@tool
+def add(a: int, b: int) -> int:
+    """Add two numbers together."""
+    result = a + b
+    print(f"{a} + {b} = {result}")
+    return result
+
+@tool
+def subtract(a: int, b: int) -> int:
+    """Subtract b from a."""
+    result = a - b
+    print(f"{a} - {b} = {result}")
+    return result
+
+def main():
+    print(tool_use.sum_as_string(1, 2))
+    # Bind the tools to the model
+    llm_with_tools = llm.bind_tools([sum_as_string, minus])
+    
+    print("Math Tools LLM")
+    print("Type 'exit' to quit")
+    print("Example: What is 5 plus 3?")
+    
+    while True:
+        user_input = input("\nYou: ")
+        if user_input.lower() == 'exit':
+            break
             
-        return response
+        # Get the model's response with tool calls
+        message = llm_with_tools.invoke([("user", user_input)])
         
-    except Exception as e:
-        return f"An error occurred: {str(e)}"
+        # Execute any tool calls
+        if hasattr(message, 'tool_calls') and message.tool_calls:
+            for tool_call in message.tool_calls:
+                tool_name = tool_call['name']
+                args = tool_call['args']
+                
+                if tool_name == 'sum_as_string':
+                    print(sum_as_string.invoke(args))
+                elif tool_name == 'minus':
+                    print(minus.invoke(args))
 
-# Example usage
 if __name__ == "__main__":
-    questions = [
-        "What is 5 plus 7?",
-        "Add 10 and 20",
-        "Calculate the sum of 15 and 25",
-        "How much is 100 plus 200?",
-        "I need to add 50 and 75"
-    ]
-    
-    for question in questions:
-        print(f"\nQuestion: {question}")
-        response = run_agent(question)
-        print(f"Response: {response}")
-    
-    # Test with a non-math question
-    print("\nQuestion: What's the weather like today?")
-    print(f"Response: {run_agent("What's the weather like today?")}")
+    main()

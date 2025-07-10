@@ -3,3 +3,8 @@ langchain-core>=0.1.23
 langchain-community>=0.0.20
 langchain>=0.1.9
 maturin>=1.0.0  # For building the Rust Python extension
+
+
+langchain-openai>=0.1.0
+python-dotenv>=1.0.0
+
